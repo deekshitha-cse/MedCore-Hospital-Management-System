@@ -1,0 +1,16 @@
+# Environment variables (real secrets — never commit)
+.env
+.env.local
+.env.*.local
+
+# Dependencies (if anything's ever installed at root level)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
