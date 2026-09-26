@@ -13,3 +13,414 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  SUPER_ADMIN
+  HOSPITAL_ADMIN
+  DOCTOR
+  NURSE
+  RECEPTIONIST
+  LAB_TECHNICIAN
+  PHARMACIST
+  ACCOUNTANT
+  PATIENT
+}
+
+enum Status {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum MedicineType {
+  TABLET
+  CAPSULE
+  SYRUP
+  INJECTION
+  TROPICAL
+}
+
+enum Frequency {
+  OD
+  BD
+  TDS
+  QID
+  SOS
+}
+
+enum InvoiceStatus {
+  DRAFT
+  FINALIZED
+  PAID
+  CANCELLED
+}
+
+enum ChargeType {
+  CONSULTATION
+  LAB_TEST
+  MEDICINE
+  ROOM
+}
+
+enum LabOrderStatus {
+  ORDERED
+  SAMPLE_COLLECTED
+  RESULT_UPLOADED
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_REMINDER
+  LAB_REPORT_APPROVED
+  PRESCRIPTION_READY
+  INVOICE_GENERATED
+  PAYMENT_RECEIVED
+  LOW_STOCK_ALERT
+  EMERGENCY_APPOINTMENT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum NotificationChannel {
+  email
+  SMS
+  IN_APP
+}
+
+model Room {
+  id           String      @id @default(uuid())
+  hospitalId   String
+  hospital     Hospital    @relation(fields: [hospitalId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  roomNumber   String
+  capacity     Int         @default(1)
+
+  @@unique([hospitalId, roomNumber])
+}
+
+model Department {
+  id         String   @id @default(uuid())
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id])
+  name       String
+
+  room        Room[]
+  doctors     DoctorDepartment[]
+  appointment Appointment[]
+
+  @@unique([hospitalId, name])
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  role         Role
+  hospitalId   String?
+  hospital     Hospital? @relation(fields: [hospitalId], references: [id])
+  email        String    @unique
+  hashPassword String
+
+  doctor        Doctor?
+  patient       Patient?
+  notifications Notification[]
+  auditLog      AuditLog[]
+}
+
+model Hospital {
+  id         String   @id @default(uuid())
+  name       String
+  addressId  String   @unique
+  address    Address  @relation(fields: [addressId], references: [id])
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  room          Room[]
+  user          User[]
+  department    Department[]
+  doctor        Doctor[]
+  patient       Patient[]
+  appointment   Appointment[]
+  medicalRecord MedicalRecord[]
+  medicine      Medicine[]
+  invoice       Invoice[]
+  labTests      LabTest[]
+  labOrders     LabOrder[]
+  notifications Notification[]
+  auditLog      AuditLog[]
+  pharmacies    Pharmacy[]
+}
+
+model Address {
+  id         String @id @default(uuid())
+  street     String
+  city       String
+  state      String
+  postalCode String
+  country    String
+
+  hospital Hospital?
+  patient  Patient?
+}
+
+model Doctor {
+  id             String    @id @default(uuid())
+  specialization String
+  hospitalId     String
+  hospital       Hospital  @relation(fields: [hospitalId], references: [id])
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id])
+  deletedAt      DateTime?
+
+  appointment   Appointment[]
+  departments   DoctorDepartment[]
+  medicalRecord MedicalRecord[]
+}
+
+model Patient {
+  id         String    @id @default(uuid())
+  addressId  String    @unique
+  address    Address   @relation(fields: [addressId], references: [id])
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id])
+  hospitalId String
+  hospital   Hospital  @relation(fields: [hospitalId], references: [id])
+  deletedAt  DateTime?
+
+  appointment   Appointment[]
+  medicalRecord MedicalRecord[]
+  invoice       Invoice[]
+}
+
+model DoctorDepartment {
+  id           String     @id @default(uuid())
+  doctorId     String
+  doctor       Doctor     @relation(fields: [doctorId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+
+  @@unique([doctorId, departmentId])
+}
+
+model Appointment {
+  id           String      @id @default(uuid())
+  status       Status
+  isEmergency  Boolean     @default(false)
+  doctorId     String
+  doctor       Doctor      @relation(fields: [doctorId], references: [id])
+  patientId    String
+  patient      Patient     @relation(fields: [patientId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  hospitalId   String
+  hospital     Hospital    @relation(fields: [hospitalId], references: [id])
+  scheduledAt  DateTime
+  durationMins Int         @default(30)
+
+  medicalRecord MedicalRecord?
+  invoice       Invoice?
+
+  deletedAt DateTime?
+}
+
+model MedicalRecord {
+  id String @id @default(uuid())
+
+  hospitalId    String
+  hospital      Hospital    @relation(fields: [hospitalId], references: [id])
+  patientId     String
+  patient       Patient     @relation(fields: [patientId], references: [id])
+  doctorId      String
+  doctor        Doctor      @relation(fields: [doctorId], references: [id])
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  bloodPressure String?
+  pulse         Int?
+  temperature   Float?
+  spo2          Int?
+  heightCm      Float?
+  weightKg      Float?
+
+  chiefComplaint     String?
+  presentingSymptoms String?
+  diagnosis          String?
+  icd10Code          String?
+  treatmentPlan      String?
+  allergies          String?
+
+  familyDiabetes     Boolean @default(false)
+  familyHypertension Boolean @default(false)
+  familyCancer       Boolean @default(false)
+  familyCardiac      Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  vaccinations  Vaccination[]
+  attachedFiles AttachedFile[]
+  prescription  Prescription[]
+  labOrder      LabOrder[]
+}
+
+model Vaccination {
+  id              String        @id @default(uuid())
+  medicalRecordId String
+  medicalRecord   MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  vaccineName     String
+  dateGiven       DateTime
+  batchNumber     String
+  nextDueDate     DateTime?
+}
+
+model AttachedFile {
+  id              String        @id @default(uuid())
+  medicalRecordId String
+  medicalRecord   MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  fileUrl         String
+  fileSizeBytes   Int
+  uploadedAt      DateTime      @default(now())
+}
+
+model Prescription {
+  id                 String             @id @default(uuid())
+  doctorSignatureUrl String
+  medicines          PrescriptionItem[]
+  medicalRecordId    String
+  medicalRecord      MedicalRecord      @relation(fields: [medicalRecordId], references: [id])
+}
+
+model Medicine {
+  id            String             @id @default(uuid())
+  name          String
+  hospitalId    String
+  reorderLevel  Int                @default(10)
+  hospital      Hospital           @relation(fields: [hospitalId], references: [id])
+  prescriptions PrescriptionItem[]
+  pharmacy      MedicineBatch[]
+}
+
+model PrescriptionItem {
+  id                 String       @id @default(uuid())
+  type               MedicineType
+  dosage             String
+  durationDays       Int
+  frequency          Frequency
+  specialIntructions String?
+  prescriptionId     String
+  prescription       Prescription @relation(fields: [prescriptionId], references: [id])
+  medicineId         String
+  medicine           Medicine     @relation(fields: [medicineId], references: [id])
+}
+
+model MedicineBatch {
+  id                String   @id @default(uuid())
+  batchNumber       String
+  manufacturingDate DateTime
+  expiryDate        DateTime
+  quantity          Int
+  unitCost          Float
+  MRP               Float
+  medicineId        String
+  medicine          Medicine @relation(fields: [medicineId], references: [id])
+  pharmacyId        String
+  pharmacy          Pharmacy @relation(fields: [pharmacyId], references: [id])
+}
+
+model Pharmacy {
+  id         String          @id @default(uuid())
+  hospitalId String
+  hospital   Hospital        @relation(fields: [hospitalId], references: [id])
+  medicines  MedicineBatch[]
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  patientId     String
+  patient       Patient       @relation(fields: [patientId], references: [id])
+  hospitalId    String
+  hospital      Hospital      @relation(fields: [hospitalId], references: [id])
+  appointmentId String        @unique
+  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
+  amount        Float
+  invoiceStatus InvoiceStatus
+
+  invoiceItem InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String     @id @default(uuid())
+  chargeType  ChargeType
+  invoiceId   String
+  description String
+  amount      Float
+  invoice     Invoice    @relation(fields: [invoiceId], references: [id])
+}
+
+model LabTest {
+  id         String   @id @default(uuid())
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id])
+  name       String
+
+  labOrderItems LabOrderItem[]
+}
+
+model LabOrder {
+  id              String         @id @default(uuid())
+  hospitalId      String
+  hospital        Hospital       @relation(fields: [hospitalId], references: [id])
+  medicalRecordId String
+  medicalRecord   MedicalRecord  @relation(fields: [medicalRecordId], references: [id])
+  status          LabOrderStatus @default(ORDERED)
+  createdAt       DateTime       @default(now())
+
+  items LabOrderItem[]
+}
+
+model LabOrderItem {
+  id             String   @id @default(uuid())
+  labOrderId     String
+  labOrder       LabOrder @relation(fields: [labOrderId], references: [id])
+  labTestId      String
+  labTest        LabTest  @relation(fields: [labTestId], references: [id])
+  resultValue    String?
+  resultFileUrl  String?
+  referenceRange String?
+  isOutOfRange   Boolean?
+}
+
+model Notification {
+  id         String              @id @default(uuid())
+  hospitalId String
+  hospital   Hospital            @relation(fields: [hospitalId], references: [id])
+  userId     String
+  user       User                @relation(fields: [userId], references: [id])
+  type       NotificationType
+  channel    NotificationChannel
+  message    String
+  isRead     Boolean             @default(false)
+  createdAt  DateTime            @default(now())
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  hospitalId String
+  hospital   Hospital    @relation(fields: [hospitalId], references: [id])
+  userId     String
+  user       User        @relation(fields: [userId], references: [id])
+  action     AuditAction
+  entityName String
+  entityId   String
+  ipAddress  String
+  createdAt  DateTime    @default(now())
+}
