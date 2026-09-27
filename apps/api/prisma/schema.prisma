@@ -6,7 +6,8 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
@@ -315,7 +316,7 @@ model PrescriptionItem {
   dosage             String
   durationDays       Int
   frequency          Frequency
-  specialIntructions String?
+  specialInstructions String?
   prescriptionId     String
   prescription       Prescription @relation(fields: [prescriptionId], references: [id])
   medicineId         String
