@@ -129,7 +129,10 @@ model User {
   hospitalId   String?
   hospital     Hospital? @relation(fields: [hospitalId], references: [id])
   email        String    @unique
+  phone        String    @unique
   hashPassword String
+  isEmailVerified Boolean @default(false)
+  isPhoneVerified Boolean @default(false)
 
   doctor        Doctor?
   patient       Patient?
